@@ -1,55 +1,33 @@
 package main
 
 import (
-	"bytes"
+	"bachhieu/web-vpn/routes"
 	"fmt"
-	"os/exec"
-	"regexp"
+	"log"
+	"net/http"
+
+	"github.com/joho/godotenv"
+	"github.com/julienschmidt/httprouter"
 )
 
 func main() {
-	// Đọc nội dung của tệp cấu hình OpenVPN
-	configFile := "./vpngate_219.100.37.52_tcp_443.ovpn"
-	// configFile := "./1.ovpn"
-
-	// run the OpenVPN client with the configuration file
-	cmd := exec.Command("openvpn", "--config", configFile)
-	// cmd := exec.Command("echo", "hello")
-	fmt.Printf("import file config 1 \n")
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	fmt.Printf("import file config 2 \n")
-	err := cmd.Start()
-	fmt.Println("err :", err)
-	if err == nil {
-		fmt.Println("Failed to start OpenVPN:", err)
-		fmt.Println("---------------------")
-
-	} else {
-		fmt.Println("Failed to start OpenVPN:", err)
-		fmt.Println("++++++++++++++++++")
-		return
-	}
-
-	// parse the output to determine if the connection is successful
-	output := stdout.String() + stderr.String()
-	fmt.Println("output: ", output)
-	re := regexp.MustCompile(`Initialization Sequence Completed`)
-	fmt.Println("\n re: ", re)
-	fmt.Println("\n re.MatchString(output) ", re.MatchString(output))
-	if re.MatchString(output) {
-		fmt.Println("VPN is live")
-		// do something with the live VPN connection here
-	} else {
-		fmt.Println("VPN is not live:", output)
-		// handle the case where the VPN connection failed
-	}
-
-	// terminate the OpenVPN client
-	err = cmd.Wait()
+	err := godotenv.Load()
 	if err != nil {
-		fmt.Println("Failed to terminate OpenVPN:", err)
-		return
+		log.Fatalf("Error getting env, %v", err)
 	}
+	
+	router := httprouter.New()
+	
+	router.GET("/get-vpn", routes.GetAllVpns)
+	// router.POST("/auth/login", routes.Login)
+	// router.POST("/auth/register", routes.Register)
+
+	// router.GET("/posts", middlewares.CheckJwt(routes.GetAllPosts))
+	// router.GET("/me/posts", middlewares.CheckJwt(routes.GetMyPosts))
+	// router.POST("/posts", middlewares.CheckJwt(routes.CreatePost))
+	// router.PUT("/posts/:id", middlewares.CheckJwt(routes.EditPost))
+	// router.DELETE("/posts/:id", middlewares.CheckJwt(routes.DeletePost))
+
+	fmt.Println("Listening to port 8000")
+	log.Fatal(http.ListenAndServe(":8000", router))
 }
