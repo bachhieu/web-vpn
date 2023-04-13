@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/julienschmidt/httprouter"
@@ -18,20 +19,18 @@ import (
 
 func GetAllVpns(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	fmt.Println("Call Api")
-
 	resp, err := http.Get("http://www.vpngate.net/api/iphone/")
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		// Handle error
 		res.JSON(w, 400, err)
 
-
 	}
 	body = bytes.Trim(body, "*vpn_servers")
 	body = body[:len(body)-1]
 	// res.JSON(w, 400, body)
 	// return
-	
+
 	s := strings.ReplaceAll(string(body), `"`, ``)
 	reader := csv.NewReader(strings.NewReader(string(s)))
 	fmt.Println("paser CSV")
@@ -44,7 +43,6 @@ func GetAllVpns(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 		return
 	}
-
 
 	var data []map[string]string
 	for _, record := range records[1:] {
@@ -59,24 +57,26 @@ func GetAllVpns(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	ResJsonData := make([]models.Vpn, 0)
 	err = json.Unmarshal(jsonData, &ResJsonData)
 	if err != nil {
 		panic(err)
-	} 
+	}
 	fmt.Println("loop ResJsonData ")
+	path, err := os.Getwd()
+	fmt.Println("path---->", path)
 	for i, j := range ResJsonData {
 		bytes, err := base64.StdEncoding.DecodeString(j.OpenVPN_ConfigData_Base64)
-			err = ioutil.WriteFile("vpn.ovpn", bytes, 0)
-			if err != nil {
-				fmt.Println("error:", err)
-				return
+		err = ioutil.WriteFile("./config.ovpn", bytes, 0)
+		if err != nil {
+			fmt.Println("error:", err)
+			return
 		}
 		live := helper.CheckVpnIsLive()
-	fmt.Printf("index: %v--- live: %v \n ",i,live)
+		fmt.Printf("index: %v --- live: %v \n ", i, live)
 
-	helper.KillProcess()
+		helper.KillProcess()
 		if live == true {
 			// save in DB
 		} else {

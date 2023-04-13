@@ -1,0 +1,17 @@
+---
+version: "2.1"
+services:
+  app:
+    build: .
+    restart: always
+    ports:
+      - 8000:8000
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    user: root
+    networks:
+      - vpn
+networks:
+  vpn:
+    driver: bridge
