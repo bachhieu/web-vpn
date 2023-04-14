@@ -6,6 +6,9 @@ import (
 	"strings"
 )
 
+/*
+kill process is running to continue with new process
+*/
 func KillProcess() {
 	cmd := exec.Command("tasklist")
 	output, _ := cmd.Output()
