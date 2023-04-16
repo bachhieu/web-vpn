@@ -48,7 +48,7 @@ func (ctl *VpnController) CrawlVpn(c echo.Context) error {
 		panic(err)
 	}
 
-	ResJsonData := make([]models.Vpn, 0)
+	ResJsonData := make([]models.VpnModel, 0)
 	err = json.Unmarshal(jsonData, &ResJsonData)
 	if err != nil {
 		panic(err)
