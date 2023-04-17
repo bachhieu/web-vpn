@@ -9,8 +9,8 @@ import (
 type VpnModel struct {
 	Id                        primitive.ObjectID `bson:"_id,omitempty"`
 	CreatedAt                 time.Time          `bson:"created_at,omitempty"`
-	UpdatedAt                 time.Time          `bson:"created_at,omitempty"`
-	Live 					  bool				 `json:"live"`
+	UpdatedAt                 time.Time          `bson:"updated_at,omitempty"`
+	Live                      bool               `json:"live"`
 	HostName                  string             `json:"#HostName"`
 	CountryLong               string             `json:"CountryLong"`
 	CountryShort              string             `json:"CountryShort"`

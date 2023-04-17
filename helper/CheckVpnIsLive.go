@@ -27,8 +27,7 @@ func CheckVpnIsLive() bool {
 	time.Sleep(10 * time.Second) // await cmd run in 10s
 	err = cmd.Process.Kill()     // close cmd
 	if err != nil {
-		_, err = fmt.Println("Failed to start OpenVPN")
-		panic(err)
+		fmt.Printf("\n Failed to kill process %s \n", err)
 
 	}
 	// parse the output to determine if the connection is successful
