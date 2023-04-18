@@ -2,6 +2,7 @@ package services
 
 import (
 	"bachhieu/web-vpn/models"
+	"bachhieu/web-vpn/utils"
 	"context"
 	"fmt"
 	"log"
@@ -19,15 +20,15 @@ func CreateVpnCollectioon(client *mongo.Client) {
 	vpnCollection = client.Database(DATABASE).Collection("vpn")
 }
 
-func (ctl *VpnService) FindVpnlive() models.VpnModel {
-	cur, err := vpnCollection.Find(context.Background(), bson.M{"live": true})
+func (ctl *VpnService) FindVpn(query bool) (utils.ResData, error) {
+	cur, err := vpnCollection.Find(context.Background(), bson.M{"live": query})
 	defer cur.Close(context.Background())
-	vpnModel := models.VpnModel{}
-	err = cur.Decode(&vpnModel)
+	vpnModel := []models.VpnModel{}
+	err = cur.All(context.Background(), &vpnModel)
 	if err != nil {
-		log.Fatal(err)
+		return utils.ResData{Total: 0, Data: nil}, err
 	}
-	return vpnModel
+	return utils.ResData{Total: len(vpnModel), Data: vpnModel}, err
 }
 
 func (ctl *VpnService) CheckVpnExistAndLive() models.VpnModel {
@@ -59,4 +60,15 @@ func (ctl *VpnService) CheckVpnIsExistByName(query string) bool {
 		return false
 	}
 	return true
+}
+
+func (ctl *VpnService) FindOneVpnByName(query string) models.VpnModel {
+	var vpn models.VpnModel
+	cur := vpnCollection.FindOne(context.Background(), bson.M{"hostname": query})
+	err := cur.Decode(&vpn)
+
+	if err != nil {
+		return models.VpnModel{}
+	}
+	return vpn
 }

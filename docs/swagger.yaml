@@ -1,0 +1,145 @@
+swagger: "2.0"
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is a sample server Petstore server.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Swagger Example API
+  version: "1.0"
+paths:
+  /api/v1/vpn/crawl:
+    get:
+      summary: Crawl vpn by Id
+      tags:
+      - Vpn
+      consumes:
+      - application/json
+      description: Crawl vpn by Id
+      parameters:
+      - in: path
+        name: url
+        required: true
+        type: string
+        default: https://www.vpngate.net/api/iphone/
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  res_message:
+                    type: string
+                    example: "Success"
+        400:
+          $ref: "#/components/responses/400"
+  /api/v1/vpn/get-all:
+    get:
+      summary: Get all vpn is live or not live
+      tags:
+      - Vpn
+      consumes:
+      - application/json
+      description: Return all vpn live or not live
+      parameters:
+      - in: query
+        name: live
+        required: true
+        type: boolean
+        default: true
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  res_message:
+                    type: string
+                    example: "Success"
+        400:
+          $ref: "#/components/responses/400"
+  /api/v1/vpn/{name}/download:
+    get:
+      summary: Download file config of vpn
+      tags:
+      - Vpn
+      consumes:
+      - application/json
+      description: Return file config of vpn
+      parameters:
+      - in: path
+        name: name
+        required: true
+        type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  res_message:
+                    type: string
+                    example: "Success"
+        404:
+          $ref: "#/components/responses/404"
+                                    
+components:
+    securitySchemes:
+        bearerAuth:
+            type: http
+            scheme: bearer
+            bearerFormat: JWT
+    responses:
+        400:
+            description: Invalid request
+            content:
+                application/json:
+                    schema:
+                        type: object
+                        properties:
+                            status:
+                                type: number
+                                example: 400
+                            message:
+                                type: string
+                                example: "Bad request"
+        401:
+            description: Access token is missing or invalid
+            content:
+                application/json:
+                    schema:
+                        type: object
+                        properties:
+                            error:
+                                type: string
+                                example: "Unauthorized"
+        403:
+            description: Forbidden
+            content:
+                application/json:
+                    schema:
+                        type: object
+                        properties:
+                            error:
+                                type: string
+                                example: "Forbidden"
+        404:
+            description: Not found
+            content:
+                application/json:
+                    schema:
+                        type: object
+                        properties:
+                            error:
+                                type: string
+                                example: "Data not found"

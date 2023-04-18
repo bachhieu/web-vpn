@@ -4,6 +4,7 @@ import (
 	"bachhieu/web-vpn/helper"
 	"bachhieu/web-vpn/models"
 	"bachhieu/web-vpn/services"
+	"bachhieu/web-vpn/utils"
 	"bytes"
 	"encoding/base64"
 	"encoding/csv"
@@ -11,6 +12,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -20,7 +22,14 @@ import (
 var vpnService *services.VpnService
 
 func (ctl *VpnController) CrawlVpn(c echo.Context) error {
-	bytesBody, err := helper.CallApi("http://www.vpngate.net/api/iphone/")
+	param := c.QueryParam("url")
+
+	// Kiểm tra xem chuỗi có phải là URL hợp lệ hay không
+	_, err := url.ParseRequestURI(param)
+	if err != nil {
+		return c.JSON(http.StatusOK, utils.ResFail(400, "Bad Request!", "Chuỗi không phải là URL hợp lệ"))
+	}
+	bytesBody, err := helper.CallApi(param)
 
 	// Eliminate redundant fields ==> csv format
 	bytesBody = bytes.Trim(bytesBody, "*vpn_servers")
@@ -59,7 +68,7 @@ func (ctl *VpnController) CrawlVpn(c echo.Context) error {
 		// if not exist check vpn is live
 		fmt.Print(i, "-----")
 		if vpnService.CheckVpnIsExistByName(j.HostName) {
-			fmt.Print(i, "------> next \n")
+			fmt.Print("------> next \n")
 			continue
 		} else {
 			bytes, err := base64.StdEncoding.DecodeString(j.OpenVPN_ConfigData_Base64) // convert to base64
@@ -79,13 +88,36 @@ func (ctl *VpnController) CrawlVpn(c echo.Context) error {
 			vpnService.CreateVpn(j)
 		}
 	}
-	return c.HTML(http.StatusOK, "<b>Thank you! "+"</b>")
+	return c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", nil))
 
 }
 
 func (ctl *VpnController) GetAll(c echo.Context) error {
-	datas := vpnService.FindVpnlive()
+	live := c.QueryParam("live")
+	query := false
+	if live == "" || live == "false" {
+		query = false
+	} else if live == "true" {
+		query = true
+	}
+	res, _ := vpnService.FindVpn(query)
+	return c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", res))
 
-	return c.JSON(http.StatusOK, datas)
+}
+
+func (ctl *VpnController) Download(c echo.Context) error {
+	name := c.Param("name")
+	fmt.Print("----->>", name)
+	res := vpnService.FindOneVpnByName(name)
+	if res.OpenVPN_ConfigData_Base64 == "" {
+		return c.JSON(http.StatusOK, utils.ResFail(404, "Not Found!", "Can't found vpn by "+name))
+
+	}
+	configbyte, err := base64.StdEncoding.DecodeString(res.OpenVPN_ConfigData_Base64)
+	if err != nil {
+		fmt.Println("Lỗi:", err.Error())
+		return c.JSON(http.StatusOK, utils.ResFail(400, "Bad Request!", "can't download config"))
+	}
+	return c.Blob(http.StatusOK, "multipart/form-data", configbyte)
 
 }

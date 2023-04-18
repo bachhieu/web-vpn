@@ -5,6 +5,7 @@ import (
 	"os/exec"
 )
 
+// create tun/tap for alpine in docker
 func Init() {
 	// Create directory /dev/net
 	cmd := exec.Command("mkdir", "-p", "/dev/net")
