@@ -13,3 +13,8 @@ func ResSuccess(status int, mess string, data interface{}) ResCtrl {
 func ResFail(status int, mess string, data string) ResCtrl {
 	return ResCtrl{status, mess, data}
 }
+
+type ResData struct {
+	Total int         `json:"total"`
+	Data  interface{} `json:"data"`
+}

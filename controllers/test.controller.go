@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"bachhieu/web-vpn/services"
+	"bachhieu/web-vpn/utils"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -24,17 +25,11 @@ func (ctl *TestController) Index(c echo.Context) error {
 
 }
 
-// func (ctl *TestController) Query(c echo.Context) error {
-// 	path := c.Param("path")
-// 	paths := c.ParamNames()
-// 	querys := c.QueryParams()
-// 	query := c.QueryParam("path")
-// 	fmt.Printf("paths------>%s \n", paths)
-// 	fmt.Printf("querys------>%s \n", querys)
-// 	fmt.Printf("query------>%s \n", query)
-// 	return c.String(http.StatusOK, path)
+func (ctl *TestController) Toggle(c echo.Context) error {
+	utils.EditFile(".env", []byte("VPNGATE=false"), "VPNGATE=")
+	return c.String(http.StatusOK, "ok")
 
-// }
+}
 
 func (ctl *TestController) Query(c echo.Context) error {
 	param := c.QueryParam("url")

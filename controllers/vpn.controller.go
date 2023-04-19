@@ -10,9 +10,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -21,15 +19,62 @@ import (
 
 var vpnService *services.VpnService
 
-func (ctl *VpnController) CrawlVpn(c echo.Context) error {
-	param := c.QueryParam("url")
-
-	// Kiểm tra xem chuỗi có phải là URL hợp lệ hay không
-	_, err := url.ParseRequestURI(param)
-	if err != nil {
-		return c.JSON(http.StatusOK, utils.ResFail(400, "Bad Request!", "Chuỗi không phải là URL hợp lệ"))
+func (ctl *VpnController) CrawlVpngate(c echo.Context) error {
+	paramAuto := c.QueryParam("auto")
+	if paramAuto != "true" && paramAuto != "false" {
+		return c.JSON(http.StatusOK, utils.ResFail(400, "Bad Request!", "Field auto wrong format!"))
 	}
-	bytesBody, err := helper.CallApi(param)
+
+	auto := paramAuto == "true"
+	VPNGATE := env.VPNGATE == "true"
+	utils.EditFile(".env", []byte("VPNGATE="+paramAuto), "VPNGATE=")
+	env.VPNGATE = paramAuto
+	switch {
+	case auto && VPNGATE:
+		return c.JSON(http.StatusOK, utils.ResFail(400, "Bad Request!", "Crawl data really is auto!"))
+	case auto && !VPNGATE:
+		return c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", "Switch crawl vpn auto successful!"))
+	case !auto && VPNGATE:
+		defer c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", "Switch crawl vpn manual successful!"))
+		return crawlVpngate(c)
+	}
+	return crawlVpngate(c)
+
+}
+
+func (ctl *VpnController) GetAll(c echo.Context) error {
+	live := c.QueryParam("live")
+	query := false
+	if live == "" || live == "false" {
+		query = false
+	} else if live == "true" {
+		query = true
+	}
+	result := vpnService.FindVpn(query)
+
+	res := utils.ResData{Total: len(result), Data: result}
+	return c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", res))
+
+}
+
+func (ctl *VpnController) Download(c echo.Context) error {
+	name := c.Param("name")
+	res := vpnService.FindOneVpnByName(name)
+	if res.OpenVPN_ConfigData_Base64 == "" {
+		return c.JSON(http.StatusOK, utils.ResFail(404, "Not Found!", "Can't found vpn by "+name))
+
+	}
+	configbyte, err := base64.StdEncoding.DecodeString(res.OpenVPN_ConfigData_Base64)
+	if err != nil {
+		fmt.Println("Lỗi:", err.Error())
+		return c.JSON(http.StatusOK, utils.ResFail(400, "Bad Request!", "can't download config of "+name))
+	}
+	return c.Blob(http.StatusOK, "multipart/form-data", configbyte)
+
+}
+
+func crawlVpngate(c echo.Context) error {
+	bytesBody, err := helper.CallApi("https://www.vpngate.net/api/iphone/")
 
 	// Eliminate redundant fields ==> csv format
 	bytesBody = bytes.Trim(bytesBody, "*vpn_servers")
@@ -39,7 +84,7 @@ func (ctl *VpnController) CrawlVpn(c echo.Context) error {
 	reader.FieldsPerRecord = -1
 	records, err := reader.ReadAll()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	// strart : convert type [][]string to  []models.Vpn
 	var data []map[string]string
@@ -53,13 +98,13 @@ func (ctl *VpnController) CrawlVpn(c echo.Context) error {
 	data = data[:len(data)-1]
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	ResJsonData := make([]models.VpnModel, 0)
 	err = json.Unmarshal(jsonData, &ResJsonData)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	// end
 	for i, j := range ResJsonData {
@@ -71,16 +116,14 @@ func (ctl *VpnController) CrawlVpn(c echo.Context) error {
 			fmt.Print("------> next \n")
 			continue
 		} else {
+			fmt.Print("------> import \n")
 			bytes, err := base64.StdEncoding.DecodeString(j.OpenVPN_ConfigData_Base64) // convert to base64
-			err = ioutil.WriteFile("./config.ovpn", bytes, 0)                          // fill config vpn to file config.ovpn
 			if err != nil {
-				fmt.Println("\n error:", err)
-				return c.HTML(http.StatusOK, "<b>Thank you! "+"</b>")
-
+				continue
 			}
 			j.CreatedAt = time.Now()
 			j.UpdatedAt = time.Now()
-			if helper.CheckVpnIsLive() {
+			if helper.CheckVpnIsLive(bytes) {
 				j.Live = true
 			} else {
 				j.Live = false
@@ -88,36 +131,6 @@ func (ctl *VpnController) CrawlVpn(c echo.Context) error {
 			vpnService.CreateVpn(j)
 		}
 	}
-	return c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", nil))
-
-}
-
-func (ctl *VpnController) GetAll(c echo.Context) error {
-	live := c.QueryParam("live")
-	query := false
-	if live == "" || live == "false" {
-		query = false
-	} else if live == "true" {
-		query = true
-	}
-	res, _ := vpnService.FindVpn(query)
-	return c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", res))
-
-}
-
-func (ctl *VpnController) Download(c echo.Context) error {
-	name := c.Param("name")
-	fmt.Print("----->>", name)
-	res := vpnService.FindOneVpnByName(name)
-	if res.OpenVPN_ConfigData_Base64 == "" {
-		return c.JSON(http.StatusOK, utils.ResFail(404, "Not Found!", "Can't found vpn by "+name))
-
-	}
-	configbyte, err := base64.StdEncoding.DecodeString(res.OpenVPN_ConfigData_Base64)
-	if err != nil {
-		fmt.Println("Lỗi:", err.Error())
-		return c.JSON(http.StatusOK, utils.ResFail(400, "Bad Request!", "can't download config"))
-	}
-	return c.Blob(http.StatusOK, "multipart/form-data", configbyte)
+	return nil
 
 }

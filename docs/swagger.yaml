@@ -12,7 +12,7 @@ info:
   title: Swagger Example API
   version: "1.0"
 paths:
-  /api/v1/vpn/crawl:
+  /api/v1/vpn/vpngate/crawl:
     get:
       summary: Crawl vpn by Id
       tags:
@@ -21,11 +21,10 @@ paths:
       - application/json
       description: Crawl vpn by Id
       parameters:
-      - in: path
-        name: url
-        required: true
-        type: string
-        default: https://www.vpngate.net/api/iphone/
+      - in: query
+        name: auto
+        type: boolean
+        default: true
       responses:
         200:
           description: OK

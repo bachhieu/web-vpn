@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo/v4 v4.10.2
+	github.com/robfig/cron v1.2.0
 	github.com/swaggo/echo-swagger v1.4.0
 	github.com/swaggo/swag v1.8.12
 	go.mongodb.org/mongo-driver v1.11.4
