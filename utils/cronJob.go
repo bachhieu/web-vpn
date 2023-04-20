@@ -3,16 +3,24 @@ package utils
 import (
 	"fmt"
 
-	"github.com/robfig/cron"
+	"github.com/robfig/cron/v3"
 )
 
 type MyFuncType func()
 
 func Schedule(spec string, callback MyFuncType) *cron.Cron {
-	c := cron.New()
+	fmt.Print("cron start!!!!!!!!!!!!!!")
+	var c = cron.New()
 	c.AddFunc(spec, callback)
 	c.Start()
-	// Funcs may also be added to a running Cron
-	c.AddFunc("@daily", func() { fmt.Println("Every day") })
 	return c
+}
+
+func AddFunc(c *cron.Cron, spec string, callback MyFuncType) *cron.EntryID {
+	id, _ := c.AddFunc(spec, callback)
+	return &id
+}
+
+func RemoveFunc(c *cron.Cron, id cron.EntryID) {
+	c.Remove(id)
 }

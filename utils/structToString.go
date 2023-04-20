@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-func StructToString(input struct{}, output *string) {
+func JsonToString(input struct{}, output *string) {
 
 	// Convert struct to JSON string
 	jsonString, err := json.Marshal(input)

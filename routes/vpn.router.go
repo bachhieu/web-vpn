@@ -10,7 +10,8 @@ var vpnController = &controllers.VpnController{}
 
 func VpnInit(g *echo.Group) {
 	g.GET("/vpngate/crawl", vpnController.CrawlVpngate)
-	g.GET("/vpngate/crawl/toggle", vpnController.CrawlVpngate)
-	g.GET("/get-all", vpnController.GetAll)
+	g.POST("/vpngate/crawl/toggle", vpnController.CrawlVpngate)
+	g.POST("/cron/toggle", vpnController.ToggleCronjob)
+	g.GET("/get-all", vpnController.GetVpnByLive)
 	g.GET("/:name/download", vpnController.Download)
 }

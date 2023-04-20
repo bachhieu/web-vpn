@@ -19,8 +19,9 @@ func CreateVpnCollectioon(client *mongo.Client) {
 	vpnCollection = client.Database(DATABASE).Collection("vpn")
 }
 
-func (ctl *VpnService) FindVpn(query bool) []models.VpnModel {
-	cur, err := vpnCollection.Find(context.Background(), bson.M{"live": query})
+func (ctl *VpnService) FindVpn(query map[string]interface{}) []models.VpnModel {
+	querybyte, _ := bson.Marshal(query)
+	cur, err := vpnCollection.Find(context.Background(), querybyte)
 	defer cur.Close(context.Background())
 	vpnModel := []models.VpnModel{}
 	err = cur.All(context.Background(), &vpnModel)
@@ -29,17 +30,6 @@ func (ctl *VpnService) FindVpn(query bool) []models.VpnModel {
 	}
 	return vpnModel
 }
-
-// func (ctl *VpnService) CheckVpnExistAndLive() models.VpnModel {
-// 	cur, err := vpnCollection.Find(context.Background(), bson.M{"live": true})
-// 	defer cur.Close(context.Background())
-// 	vpnModel := models.VpnModel{}
-// 	err = cur.Decode(&vpnModel)
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-// 	return vpnModel
-// }
 
 func (ctl *VpnService) CreateVpn(vpn models.VpnModel) bool {
 	_, err := vpnCollection.InsertOne(context.Background(), vpn)
@@ -70,4 +60,13 @@ func (ctl *VpnService) FindOneVpnByName(query string) *models.VpnModel {
 		return &models.VpnModel{}
 	}
 	return &vpn
+}
+
+func (ctl *VpnService) UpdatedOne(vpn models.VpnModel) bool {
+	_, err := vpnCollection.UpdateOne(context.Background(), bson.M{"hostname": vpn.HostName}, bson.M{"$set": vpn})
+	if err != nil {
+		log.Fatal(err)
+		return false
+	}
+	return true
 }

@@ -91,6 +91,59 @@ paths:
                     example: "Success"
         404:
           $ref: "#/components/responses/404"
+  /api/v1/vpn/cron/toggle:
+    post:
+      summary: Turn on or turn off schedule cron
+      tags:
+      - Vpn
+      consumes:
+      - application/json
+      description: Turn on or turn off schedule cron
+      parameters:
+      - in: query
+        name: cron
+        required: true
+        type: boolean
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  res_message:
+                    type: string
+                    example: "Success"
+        404:
+          $ref: "#/components/responses/404"
+  /api/v1/vpn/vpngate/crawl/toggle:
+    post:
+      summary: Turn on or turn off schedule crawl auto
+      tags:
+      - Vpn
+      consumes:
+      - application/json
+      description: Turn on or turn off schedule crawl auto
+      parameters:
+      - in: query
+        name: auto
+        required: true
+        type: boolean
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  res_message:
+                    type: string
+                    example: "Success"
+        404:
+          $ref: "#/components/responses/404"
+
                                     
 components:
     securitySchemes:

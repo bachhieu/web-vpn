@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bachhieu/web-vpn/controllers"
 	"bachhieu/web-vpn/database"
 	_ "bachhieu/web-vpn/docs"
 	"bachhieu/web-vpn/routes"
@@ -35,6 +36,9 @@ func main() {
 	if httpPort == "" {
 		httpPort = "8000"
 	}
-
+	if os.Getenv("CRONJOB") == "true" {
+		vpnController := &controllers.VpnController{}
+		go vpnController.CronVpn(os.Getenv("SCHEDULE")) // schedule every day at 00:00
+	}
 	e.Logger.Fatal(e.Start(":" + httpPort))
 }

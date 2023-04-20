@@ -11,13 +11,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
+	"github.com/robfig/cron/v3"
 )
 
 var vpnService *services.VpnService
+var cronJob *cron.Cron
+var _ = godotenv.Load()
+var env = struct {
+	VPNGATE string
+	CRONJOB string
+}{
+	os.Getenv("VPNGATE"),
+	os.Getenv("CRONJOB"),
+}
+var idCrawlVpn cron.EntryID
 
 func (ctl *VpnController) CrawlVpngate(c echo.Context) error {
 	paramAuto := c.QueryParam("auto")
@@ -35,14 +48,16 @@ func (ctl *VpnController) CrawlVpngate(c echo.Context) error {
 	case auto && !VPNGATE:
 		return c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", "Switch crawl vpn auto successful!"))
 	case !auto && VPNGATE:
-		defer c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", "Switch crawl vpn manual successful!"))
-		return crawlVpngate(c)
+		c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", "Switch crawl vpn manual successful!"))
+		defer crawlVpngateHelper()
+		return nil
 	}
-	return crawlVpngate(c)
+	defer crawlVpngateHelper()
+	return nil
 
 }
 
-func (ctl *VpnController) GetAll(c echo.Context) error {
+func (ctl *VpnController) GetVpnByLive(c echo.Context) error {
 	live := c.QueryParam("live")
 	query := false
 	if live == "" || live == "false" {
@@ -50,7 +65,10 @@ func (ctl *VpnController) GetAll(c echo.Context) error {
 	} else if live == "true" {
 		query = true
 	}
-	result := vpnService.FindVpn(query)
+	m := map[string]interface{}{
+		"live": query,
+	}
+	result := vpnService.FindVpn(m)
 
 	res := utils.ResData{Total: len(result), Data: result}
 	return c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", res))
@@ -73,7 +91,7 @@ func (ctl *VpnController) Download(c echo.Context) error {
 
 }
 
-func crawlVpngate(c echo.Context) error {
+func crawlVpngateHelper() {
 	bytesBody, err := helper.CallApi("https://www.vpngate.net/api/iphone/")
 
 	// Eliminate redundant fields ==> csv format
@@ -84,7 +102,7 @@ func crawlVpngate(c echo.Context) error {
 	reader.FieldsPerRecord = -1
 	records, err := reader.ReadAll()
 	if err != nil {
-		return err
+		return
 	}
 	// strart : convert type [][]string to  []models.Vpn
 	var data []map[string]string
@@ -98,19 +116,16 @@ func crawlVpngate(c echo.Context) error {
 	data = data[:len(data)-1]
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return err
+		return
 	}
 
 	ResJsonData := make([]models.VpnModel, 0)
 	err = json.Unmarshal(jsonData, &ResJsonData)
 	if err != nil {
-		return err
+		return
 	}
 	// end
 	for i, j := range ResJsonData {
-		// here
-		// check in databse if exist then next
-		// if not exist check vpn is live
 		fmt.Print(i, "-----")
 		if vpnService.CheckVpnIsExistByName(j.HostName) {
 			fmt.Print("------> next \n")
@@ -131,6 +146,82 @@ func crawlVpngate(c echo.Context) error {
 			vpnService.CreateVpn(j)
 		}
 	}
-	return nil
+	return
 
 }
+
+func (ctl *VpnController) ToggleCronjob(c echo.Context) error {
+	cron := c.QueryParam("cron") == "true"
+	switch {
+	case cron && env.CRONJOB == "true":
+		return c.JSON(http.StatusOK, utils.ResFail(400, "Bad request!", "Schedule really is runing!"))
+	case !cron && env.CRONJOB == "true":
+		cronJob.Stop()
+		env.CRONJOB = "false"
+		return c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", "Stop cron job successful!"))
+	case cron && env.CRONJOB == "false":
+		cronJob.Start()
+		env.CRONJOB = "true"
+		return c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", "Run cron job successful!"))
+	default:
+		return c.JSON(http.StatusOK, utils.ResFail(400, "Bad request!", "Schedule really is off!"))
+	}
+}
+
+func (ctl *VpnController) CronVpn(schedule string) {
+	cronJob = utils.Schedule(schedule, ctl.cronVpnHelper)
+	if os.Getenv("VPNGATE") == "true" {
+		idCrawlVpn, _ = cronJob.AddFunc("@daily", crawlVpngateHelper)
+	}
+}
+
+func (ctl *VpnController) cronVpnHelper() {
+	m := map[string]interface{}{}
+	vpns := vpnService.FindVpn(m)
+	fmt.Print(len(vpns))
+	for i, j := range vpns {
+		fmt.Print(i, "----------> import \n")
+		fmt.Print(j, "----------> import \n")
+		// time.Sleep(5 * time.Second)
+		// bytes, err := base64.StdEncoding.DecodeString(j.OpenVPN_ConfigData_Base64) // convert to base64
+		// if err != nil {
+		// 	continue
+		// }
+		// if helper.CheckVpnIsLive(bytes) {
+		// 	j.UpdatedAt = time.Now()
+		// 	continue
+		// } else {
+		// 	if j.Live == false {
+		// 		continue
+		// 	} else {
+		// 		j.UpdatedAt = time.Now()
+		// 	}
+		// }
+		// vpnService.UpdatedOne(j)
+	}
+
+}
+
+// func (ctl *VpnController) cronVpnHelper() {
+// 	m := map[string]interface{}{}
+// 	vpns := vpnService.FindVpn(m)
+// 	for i, j := range vpns {
+// 		fmt.Print(i, "----------> import \n")
+// 		bytes, err := base64.StdEncoding.DecodeString(j.OpenVPN_ConfigData_Base64) // convert to base64
+// 		if err != nil {
+// 			continue
+// 		}
+// 		if helper.CheckVpnIsLive(bytes) {
+// 			j.UpdatedAt = time.Now()
+// 			continue
+// 		} else {
+// 			if j.Live == false {
+// 				continue
+// 			} else {
+// 				j.UpdatedAt = time.Now()
+// 			}
+// 		}
+// 		vpnService.UpdatedOne(j)
+// 	}
+
+// }

@@ -31,4 +31,5 @@ func Connection() {
 // set up collection for each feature
 func createCollection(client *mongo.Client) {
 	services.CreateVpnCollectioon(client)
+	// services.CreateTestCollectioon(client) // for test
 }
