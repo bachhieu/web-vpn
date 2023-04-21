@@ -16,9 +16,9 @@ func Schedule(spec string, callback MyFuncType) *cron.Cron {
 	return c
 }
 
-func AddFunc(c *cron.Cron, spec string, callback MyFuncType) *cron.EntryID {
+func AddFunc(c *cron.Cron, spec string, callback MyFuncType) cron.EntryID {
 	id, _ := c.AddFunc(spec, callback)
-	return &id
+	return id
 }
 
 func RemoveFunc(c *cron.Cron, id cron.EntryID) {

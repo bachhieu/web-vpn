@@ -20,7 +20,7 @@ var SwaggerInfo = &swag.Spec{
 	Title:            "Swagger Example API",
 	Description:      "This is a sample server Petstore server.",
 	InfoInstanceName: "swagger",
-	SwaggerTemplate:  docTemplate,
+	SwaggerTemplate:  docTemplate,   
     
 }
 

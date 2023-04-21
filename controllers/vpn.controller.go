@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,8 +47,10 @@ func (ctl *VpnController) CrawlVpngate(c echo.Context) error {
 	case auto && VPNGATE:
 		return c.JSON(http.StatusOK, utils.ResFail(400, "Bad Request!", "Crawl data really is auto!"))
 	case auto && !VPNGATE:
+		idCrawlVpn = utils.AddFunc(cronJob, "0 12 * * *", crawlVpngateHelper)
 		return c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", "Switch crawl vpn auto successful!"))
 	case !auto && VPNGATE:
+		utils.RemoveFunc(cronJob, idCrawlVpn)
 		c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", "Switch crawl vpn manual successful!"))
 		defer crawlVpngateHelper()
 		return nil
@@ -76,6 +79,7 @@ func (ctl *VpnController) GetVpnByLive(c echo.Context) error {
 }
 
 func (ctl *VpnController) Download(c echo.Context) error {
+	ctl.cronVpnHelper()
 	name := c.Param("name")
 	res := vpnService.FindOneVpnByName(name)
 	if res.OpenVPN_ConfigData_Base64 == "" {
@@ -88,6 +92,63 @@ func (ctl *VpnController) Download(c echo.Context) error {
 		return c.JSON(http.StatusOK, utils.ResFail(400, "Bad Request!", "can't download config of "+name))
 	}
 	return c.Blob(http.StatusOK, "multipart/form-data", configbyte)
+
+}
+
+func (ctl *VpnController) ToggleCronjob(c echo.Context) error {
+	cron := c.QueryParam("cron") == "true"
+	switch {
+	case cron && env.CRONJOB == "true":
+		return c.JSON(http.StatusOK, utils.ResFail(400, "Bad request!", "Schedule really is runing!"))
+	case !cron && env.CRONJOB == "true":
+		cronJob.Stop()
+		env.CRONJOB = "false"
+		return c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", "Stop cron job successful!"))
+	case cron && env.CRONJOB == "false":
+		cronJob.Start()
+		env.CRONJOB = "true"
+		return c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", "Run cron job successful!"))
+	default:
+		return c.JSON(http.StatusOK, utils.ResFail(400, "Bad request!", "Schedule really is off!"))
+	}
+}
+
+func (ctl *VpnController) CronVpn(schedule string) {
+	cronJob = utils.Schedule(schedule, ctl.cronVpnHelper)
+	if os.Getenv("VPNGATE") == "true" {
+		idCrawlVpn = utils.AddFunc(cronJob, "@daily", crawlVpngateHelper)
+	}
+}
+
+func (ctl *VpnController) cronVpnHelper() {
+	m := map[string]interface{}{}
+	vpns := vpnService.FindVpn(m)
+	size, err := strconv.Atoi(os.Getenv("NUM_GOROUTINES"))
+	if err != nil {
+		size = 5 // default 5 goroutines
+	}
+	numJobs := size
+	len := len(vpns)
+	jobs := make(chan models.VpnModel, len)
+	results := make(chan models.VpnModel, len)
+	for w := 1; w <= numJobs; w++ {
+		go scanCheckVpnIsLive(jobs, results)
+	}
+	for _, j := range vpns {
+		jobs <- j
+	}
+	close(jobs)
+
+	for _, i := range vpns {
+		vpn := <-results
+
+		for _, k := range vpns {
+			if k != i {
+
+			}
+		}
+		vpnService.UpdatedOne(vpn)
+	}
 
 }
 
@@ -150,78 +211,36 @@ func crawlVpngateHelper() {
 
 }
 
-func (ctl *VpnController) ToggleCronjob(c echo.Context) error {
-	cron := c.QueryParam("cron") == "true"
-	switch {
-	case cron && env.CRONJOB == "true":
-		return c.JSON(http.StatusOK, utils.ResFail(400, "Bad request!", "Schedule really is runing!"))
-	case !cron && env.CRONJOB == "true":
-		cronJob.Stop()
-		env.CRONJOB = "false"
-		return c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", "Stop cron job successful!"))
-	case cron && env.CRONJOB == "false":
-		cronJob.Start()
-		env.CRONJOB = "true"
-		return c.JSON(http.StatusOK, utils.ResSuccess(200, "Successfull!", "Run cron job successful!"))
-	default:
-		return c.JSON(http.StatusOK, utils.ResFail(400, "Bad request!", "Schedule really is off!"))
+func scanCheckVpnIsLive(vpns <-chan models.VpnModel, result chan<- models.VpnModel) {
+	for i := range vpns {
+		bytes, _ := base64.StdEncoding.DecodeString(i.OpenVPN_ConfigData_Base64) // convert to base64
+		if helper.CheckVpnIsLive(bytes) {
+			i.UpdatedAt = time.Now()
+			result <- i
+		} else {
+			if i.Live == false {
+				result <- i
+			} else {
+				i.UpdatedAt = time.Now()
+				result <- i
+			}
+		}
 	}
 }
 
-func (ctl *VpnController) CronVpn(schedule string) {
-	cronJob = utils.Schedule(schedule, ctl.cronVpnHelper)
-	if os.Getenv("VPNGATE") == "true" {
-		idCrawlVpn, _ = cronJob.AddFunc("@daily", crawlVpngateHelper)
+func setupConcu(vpns <-chan models.VpnModel, result chan<- models.VpnModel) {
+	for i := range vpns {
+		bytes, _ := base64.StdEncoding.DecodeString(i.OpenVPN_ConfigData_Base64) // convert to base64
+		if helper.CheckVpnIsLive(bytes) {
+			i.UpdatedAt = time.Now()
+			result <- i
+		} else {
+			if i.Live == false {
+				result <- i
+			} else {
+				i.UpdatedAt = time.Now()
+				result <- i
+			}
+		}
 	}
 }
-
-func (ctl *VpnController) cronVpnHelper() {
-	m := map[string]interface{}{}
-	vpns := vpnService.FindVpn(m)
-	fmt.Print(len(vpns))
-	for i, j := range vpns {
-		fmt.Print(i, "----------> import \n")
-		fmt.Print(j, "----------> import \n")
-		// time.Sleep(5 * time.Second)
-		// bytes, err := base64.StdEncoding.DecodeString(j.OpenVPN_ConfigData_Base64) // convert to base64
-		// if err != nil {
-		// 	continue
-		// }
-		// if helper.CheckVpnIsLive(bytes) {
-		// 	j.UpdatedAt = time.Now()
-		// 	continue
-		// } else {
-		// 	if j.Live == false {
-		// 		continue
-		// 	} else {
-		// 		j.UpdatedAt = time.Now()
-		// 	}
-		// }
-		// vpnService.UpdatedOne(j)
-	}
-
-}
-
-// func (ctl *VpnController) cronVpnHelper() {
-// 	m := map[string]interface{}{}
-// 	vpns := vpnService.FindVpn(m)
-// 	for i, j := range vpns {
-// 		fmt.Print(i, "----------> import \n")
-// 		bytes, err := base64.StdEncoding.DecodeString(j.OpenVPN_ConfigData_Base64) // convert to base64
-// 		if err != nil {
-// 			continue
-// 		}
-// 		if helper.CheckVpnIsLive(bytes) {
-// 			j.UpdatedAt = time.Now()
-// 			continue
-// 		} else {
-// 			if j.Live == false {
-// 				continue
-// 			} else {
-// 				j.UpdatedAt = time.Now()
-// 			}
-// 		}
-// 		vpnService.UpdatedOne(j)
-// 	}
-
-// }
